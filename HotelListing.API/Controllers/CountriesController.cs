@@ -10,11 +10,13 @@ using HotelListing.API.Entities.Country;
 using AutoMapper;
 using HotelListing.API.Repository;
 using HotelListing.API.Configurations.Contracts;
+using Microsoft.AspNetCore.Authorization;
 
 namespace HotelListing.API.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class CountriesController : ControllerBase
     {
        
@@ -33,6 +35,7 @@ namespace HotelListing.API.Controllers
 
         // GET: api/Countries
         [HttpGet]
+        
         public async Task<ActionResult<IEnumerable<CountryDto>>> GetCountries()
         {
 
@@ -113,6 +116,7 @@ namespace HotelListing.API.Controllers
 
         // DELETE: api/Countries/5  
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteCountry(int id)
         {
            

@@ -17,7 +17,10 @@ namespace HotelListing.API.Repository
         private readonly IMapper _mapper;
         private readonly UserManager<ApiUser> _userManager;
         private readonly IConfiguration _configuration;
+        private ApiUser _user;
 
+        private const string _loginProvider = "HotelListingApi";
+        private const string _refreshToken = "RefreshToken";
         public AuthManager(
             IMapper mapper,
             UserManager<ApiUser> userManager,
@@ -31,38 +34,68 @@ namespace HotelListing.API.Repository
 
         public async Task<AuthResponseDto> Login(LoginDto loginDto)
         {
-            var user = await _userManager.FindByEmailAsync(loginDto.Email);
+            var _user = await _userManager.FindByEmailAsync(loginDto.Email);
 
-            if (user == null)
+            if (_user == null)
             {
                 return null;
             }
 
-            bool isValidUserCredential = await _userManager.CheckPasswordAsync(user, loginDto.Password);
+            bool isValidUserCredential = await _userManager.CheckPasswordAsync(_user, loginDto.Password);
            
             if (!isValidUserCredential) {
                 return null;
             }
 
-            var token = await GenerateToken(user);
+            var token = await GenerateToken(_user);
 
             return new AuthResponseDto
             {
                 Token = token,
-                UserId = user.Id
+                UserId = _user.Id,
+                RefreshToken = await CreateRefreshToken(_user)
             };
         }
 
         public async Task<IEnumerable<IdentityError>> Register(ApiUserDto userDto)
         {
-            var user = _mapper.Map<ApiUser>(userDto);
-            user.UserName = userDto.Email;
-            var result = await _userManager.CreateAsync(user, userDto.Password);
+            _user = _mapper.Map<ApiUser>(userDto);
+            _user.UserName = userDto.Email;
+            var result = await _userManager.CreateAsync(_user, userDto.Password);
             if(result.Succeeded)
             {
-                await _userManager.AddToRoleAsync(user, "User");
+                await _userManager.AddToRoleAsync(_user, "User");
             }
             return result.Errors;
+        }
+
+        public async Task<AuthResponseDto> VerifyRefreshToken(AuthResponseDto request)
+        {
+            var jwtSecurityTokenHandler = new JwtSecurityTokenHandler();
+            var tokenContent = jwtSecurityTokenHandler.ReadJwtToken(request.Token);
+            var username = tokenContent.Claims.ToList().FirstOrDefault(q => q.Type == JwtRegisteredClaimNames.Email)?.Value;
+            _user = await _userManager.FindByNameAsync(username);
+            if (_user == null || _user.Id != request.UserId)
+            {
+                return null;
+            }
+            var isValidRefreshToken = await _userManager.VerifyUserTokenAsync(_user, _loginProvider, _refreshToken, request.RefreshToken);
+
+            if (isValidRefreshToken)
+            {
+                var token = await GenerateToken(_user);
+
+                return new AuthResponseDto
+                {
+                    Token = token,
+                    UserId = _user.Id,
+                    RefreshToken = await CreateRefreshToken(_user),
+                };
+            }
+
+            await _userManager.UpdateSecurityStampAsync(_user);
+
+            return null;
         }
 
         private async Task<string> GenerateToken(ApiUser user)
@@ -90,6 +123,14 @@ namespace HotelListing.API.Repository
                );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public async Task<string> CreateRefreshToken(ApiUser user)
+        {
+            await _userManager.RemoveAuthenticationTokenAsync(user, _loginProvider, _refreshToken);
+            var newRefreshToken = await _userManager.GenerateUserTokenAsync(user, _loginProvider, _refreshToken);
+            await _userManager.SetAuthenticationTokenAsync(user, _loginProvider, _refreshToken, newRefreshToken);
+            return newRefreshToken;
         }
     }
 }
