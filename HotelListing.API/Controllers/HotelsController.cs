@@ -33,7 +33,7 @@ namespace HotelListing.API.Controllers
 
         // GET: api/Hotels
         [HttpGet]
-        public async Task<ActionResult<PageResult<HotelDto>>> GetHotels([FromBody] QueryParameters queryParameters)
+        public async Task<ActionResult<PageResult<HotelDto>>> GetHotels([FromQuery] QueryParameters queryParameters)
         {
             var hotels = await _hotelsRepository.GetAllAsync<HotelDto>(queryParameters);
             return Ok(hotels);
