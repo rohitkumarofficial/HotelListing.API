@@ -10,6 +10,7 @@ using HotelListing.API.Configurations.Contracts;
 using AutoMapper;
 using HotelListing.API.Entities.Hotel;
 using Microsoft.AspNetCore.Authorization;
+using HotelListing.API.Entities;
 
 namespace HotelListing.API.Controllers
 {
@@ -32,10 +33,10 @@ namespace HotelListing.API.Controllers
 
         // GET: api/Hotels
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<HotelDto>>> GetHotels()
+        public async Task<ActionResult<PageResult<HotelDto>>> GetHotels([FromBody] QueryParameters queryParameters)
         {
-            var hotels = await _hotelsRepository.GetAllAsync();
-            return Ok(_mapper.Map<List<HotelDto>>(hotels));
+            var hotels = await _hotelsRepository.GetAllAsync<HotelDto>(queryParameters);
+            return Ok(hotels);
         }
 
         // GET: api/Hotels/5
